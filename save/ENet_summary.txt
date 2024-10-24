@@ -1,0 +1,25 @@
+ARGUMENTS
+batch_size: 8
+dataset: neuseg
+dataset_dir: data/neuseg
+device: cuda
+epochs: 300
+height: 200
+ignore_unlabeled: False
+learning_rate: 0.0005
+lr_decay: 0.1
+lr_decay_epochs: 100
+mode: train
+name: ENet
+predict: False
+print_step: False
+resume: False
+save_dir: save
+weighing: ENet
+weight_decay: 0.0002
+width: 200
+workers: 4
+
+BEST VALIDATION
+Epoch: 20
+Mean IoU: 0.9742480772575591

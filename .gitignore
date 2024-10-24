@@ -112,3 +112,7 @@ venv.bak/
 .vscode/
 *.code-workspace
 .devcontainer
+
+*.jpg
+*.png
+*.npy

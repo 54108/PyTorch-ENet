@@ -8,6 +8,8 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 
 from PIL import Image
+import numpy as np
+import tqdm
 
 import transforms as ext_transforms
 from models.enet import ENet
@@ -22,6 +24,12 @@ import utils
 args = get_arguments()
 
 device = torch.device(args.device)
+
+# 定义图像转换
+test_transform = transforms.Compose([
+    transforms.Resize((200, 200)),
+    transforms.ToTensor()
+])
 
 
 def load_dataset(dataset):
@@ -94,22 +102,22 @@ def load_dataset(dataset):
 
     # Get a batch of samples to display
     if args.mode.lower() == 'test':
-        images, labels = iter(test_loader).next()
+        images, labels = next(iter(train_loader))
     else:
-        images, labels = iter(train_loader).next()
+        images, labels = next(iter(train_loader))
     print("Image size:", images.size())
     print("Label size:", labels.size())
     print("Class-color encoding:", class_encoding)
 
     # Show a batch of samples and labels
-    if args.imshow_batch:
-        print("Close the figure window to continue...")
-        label_to_rgb = transforms.Compose([
-            ext_transforms.LongTensorToRGBPIL(class_encoding),
-            transforms.ToTensor()
-        ])
-        color_labels = utils.batch_transform(labels, label_to_rgb)
-        utils.imshow_batch(images, color_labels)
+    # if args.imshow_batch:
+    #     print("Close the figure window to continue...")
+    #     label_to_rgb = transforms.Compose([
+    #         ext_transforms.LongTensorToRGBPIL(class_encoding),
+    #         transforms.ToTensor()
+    #     ])
+    #     color_labels = utils.batch_transform(labels, label_to_rgb)
+    #     utils.imshow_batch(images, color_labels)
 
     # Get class weights from the selected weighing technique
     print("\nWeighing technique:", args.weighing)
@@ -166,7 +174,7 @@ def train(train_loader, val_loader, class_weights, class_encoding):
         ignore_index = list(class_encoding).index('unlabeled')
     else:
         ignore_index = None
-    metric = IoU(num_classes, ignore_index=ignore_index)
+    metric = IoU(num_classes, ignore_index=0)
 
     # Optionally resume from a checkpoint
     if args.resume:
@@ -205,11 +213,10 @@ def train(train_loader, val_loader, class_weights, class_encoding):
                     print("{0}: {1:.4f}".format(key, class_iou))
 
             # Save the model if it's the best thus far
-            if miou > best_miou:
-                print("\nBest model thus far. Saving...\n")
-                best_miou = miou
-                utils.save_checkpoint(model, optimizer, epoch + 1, best_miou,
-                                      args)
+            print("\nBest model thus far. Saving...\n")
+            best_miou = miou
+            utils.save_checkpoint(model, optimizer, epoch + 1, best_miou,
+                                    args)
 
     return model
 
@@ -246,30 +253,49 @@ def test(model, test_loader, class_weights, class_encoding):
         print("{0}: {1:.4f}".format(key, class_iou))
 
     # Show a batch of samples and labels
-    if args.imshow_batch:
-        print("A batch of predictions from the test set...")
-        images, _ = iter(test_loader).next()
-        predict(model, images, class_encoding)
+    if args.predict:
+        predict()
 
 
-def predict(model, images, class_encoding):
-    images = images.to(device)
+def predict():
+    # 图片目录
+    image_dir = 'neuseg/test/images'
 
-    # Make predictions!
-    model.eval()
-    with torch.no_grad():
-        predictions = model(images)
+    # 获取所有图片文件
+    image_files = [f for f in os.listdir(image_dir) if os.path.isfile(os.path.join(image_dir, f))]
+    for image_file in tqdm(image_files, desc="Processing images"):
+        image_path = os.path.join(image_dir, image_file)
+        image = Image.open(image_path).convert('RGB')
+        image = test_transform(image).unsqueeze(0)  # 添加批次维度
+        image = image.to(device)
 
-    # Predictions is one-hot encoded with "num_classes" channels.
-    # Convert it to a single int using the indices where the maximum (1) occurs
-    _, predictions = torch.max(predictions.data, 1)
+        # 打印图像信息
+        print(image)
 
-    label_to_rgb = transforms.Compose([
-        ext_transforms.LongTensorToRGBPIL(class_encoding),
-        transforms.ToTensor()
-    ])
-    color_predictions = utils.batch_transform(predictions.cpu(), label_to_rgb)
-    utils.imshow_batch(images.data.cpu(), color_predictions)
+        # 进行预测
+        model.eval()
+        with torch.no_grad():
+            predictions = model(image)
+
+        # Predictions is one-hot encoded with "num_classes" channels.
+        # Convert it to a single int using the indices where the maximum (1) occurs
+        _, predictions = torch.max(predictions.data, 1)
+
+        # Ensure the output shape is (200, 200)
+        output_np = predictions.cpu().numpy()
+        if output_np.shape[1] != 200 or output_np.shape[2] != 200:
+            output_np = np.resize(output_np, (output_np.shape[0], 200, 200))
+
+        # 保存每个输出为单独的 .npy 文件
+        for i, output in enumerate(output_np):
+            np.save(f"predict/{image_file}.npy", output)
+
+    # label_to_rgb = transforms.Compose([
+    #     ext_transforms.LongTensorToRGBPIL(class_encoding),
+    #     transforms.ToTensor()
+    # ])
+    # color_predictions = utils.batch_transform(predictions.cpu(), label_to_rgb)
+    # utils.imshow_batch(images.data.cpu(), color_predictions)
 
 
 # Run only if this module is being run directly
@@ -290,12 +316,14 @@ if __name__ == '__main__':
         from data import CamVid as dataset
     elif args.dataset.lower() == 'cityscapes':
         from data import Cityscapes as dataset
+    elif args.dataset.lower() == 'neuseg':
+        from data.neuseg import neuseg as neuseg
     else:
         # Should never happen...but just in case it does
         raise RuntimeError("\"{0}\" is not a supported dataset.".format(
             args.dataset))
 
-    loaders, w_class, class_encoding = load_dataset(dataset)
+    loaders, w_class, class_encoding = load_dataset(neuseg)
     train_loader, val_loader, test_loader = loaders
 
     if args.mode.lower() in {'train', 'full'}:

@@ -27,8 +27,8 @@ def get_arguments():
         "--batch-size",
         "-b",
         type=int,
-        default=10,
-        help="The batch size. Default: 10")
+        default=8,
+        help="The batch size. Default: 2")
     parser.add_argument(
         "--epochs",
         type=int,
@@ -61,24 +61,24 @@ def get_arguments():
     # Dataset
     parser.add_argument(
         "--dataset",
-        choices=['camvid', 'cityscapes'],
-        default='camvid',
-        help="Dataset to use. Default: camvid")
+        choices=['camvid', 'cityscapes', 'neuseg'],
+        default='neuseg',
+        help="Dataset to use. Default: neuseg")
     parser.add_argument(
         "--dataset-dir",
         type=str,
-        default="data/CamVid",
+        default="data/neuseg",
         help="Path to the root directory of the selected dataset. "
-        "Default: data/CamVid")
+        "Default: data/neuseg")
     parser.add_argument(
         "--height",
         type=int,
-        default=360,
+        default=200,
         help="The image height. Default: 360")
     parser.add_argument(
         "--width",
         type=int,
-        default=480,
+        default=200,
         help="The image width. Default: 480")
     parser.add_argument(
         "--weighing",
@@ -89,7 +89,7 @@ def get_arguments():
     parser.add_argument(
         "--with-unlabeled",
         dest='ignore_unlabeled',
-        action='store_false',
+        action='store_true',
         help="The unlabeled class is not ignored.")
 
     # Settings
@@ -103,7 +103,7 @@ def get_arguments():
         action='store_true',
         help="Print loss every step")
     parser.add_argument(
-        "--imshow-batch",
+        "--predict",
         action='store_true',
         help=("Displays batch images when loading the dataset and making "
               "predictions."))
