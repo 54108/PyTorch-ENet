@@ -90,3 +90,54 @@ class IoU(metric.Metric):
             iou = true_positive / (true_positive + false_positive + false_negative)
 
         return iou, np.nanmean(iou)
+
+class IoU:
+    def __init__(self, num_classes, normalized=False, ignore_index=None):
+        self.num_classes = num_classes
+        self.hist = np.zeros((num_classes, num_classes))
+
+    def reset(self):
+        """重置混淆矩阵"""
+        self.hist = np.zeros((self.num_classes, self.num_classes))
+
+    def add(self, pred, label):
+        """添加预测和标签数据到混淆矩阵"""
+        if pred.dim() == 4:
+            _, pred = pred.max(1)
+        if label.dim() == 4:
+            _, label = label.max(1)
+        if len(label.flatten()) != len(pred.flatten()):
+            print('Skipping: len(gt) = {:d}, len(pred) = {:d}'.format(
+                len(label.flatten()), len(pred.flatten())))
+            return
+
+        self.hist += self.fast_hist(label.flatten(), pred.flatten(), self.num_classes)
+
+    def value(self):
+        """计算并返回每个类别的IoU和平均IoU"""
+        mIoUs = self.per_class_iu(self.hist)
+        mPA = self.per_class_PA(self.hist)
+        miou = np.nanmean(mIoUs)
+        print('===> mIoU: ' + str(round(miou * 100, 4)) +
+            '; mPA: ' + str(round(np.nanmean(mPA) * 100, 4)))
+        return mIoUs, miou
+
+    @staticmethod
+    def fast_hist(a, b, n):
+        """计算混淆矩阵"""
+        a = a.cpu().numpy() if isinstance(a, torch.Tensor) else a
+        b = b.cpu().numpy() if isinstance(b, torch.Tensor) else b
+        k = (a >= 0) & (a < n)
+        return np.bincount(n * a[k].astype(int) + b[k], minlength=n ** 2).reshape(n, n)
+
+    @staticmethod
+    def per_class_iu(hist):
+        """计算每个类别的IoU"""
+        print('Defect class IoU as follows:')
+        print(np.diag(hist)[1:] / np.maximum((hist.sum(1) + hist.sum(0) - np.diag(hist))[1:], 1))
+        return np.diag(hist)[1:] / np.maximum((hist.sum(1) + hist.sum(0) - np.diag(hist))[1:], 1)
+
+    @staticmethod
+    def per_class_PA(hist):
+        """计算每个类别的准确率"""
+        return np.diag(hist) / np.maximum(hist.sum(1), 1)

@@ -205,8 +205,8 @@ if __name__ == '__main__':
     # Load the previoulsy saved model state to the ENet model
     # checkpoint = torch.load('model.pth')
     # model.load_state_dict(checkpoint['state_dict'])
-    # model.load_state_dict(torch.load('model.pth', weights_only=True))
-    model.load_state_dict(torch.load('checkpoint.pth'))
+    model.load_state_dict(torch.load('model.pth', weights_only=True))
+    # model.load_state_dict(torch.load('checkpoint.pth'))
 
     # 创建 Predictor 实例并运行
     predictor = Predict(model, test_file_path, device)
