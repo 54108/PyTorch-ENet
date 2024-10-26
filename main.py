@@ -151,9 +151,9 @@ def train(train_loader, val_loader, class_weights, class_encoding):
     num_classes = len(class_encoding)
 
     # Intialize ENet
-    if args.model.lower() == 'enet':
+    if args.net.lower() == 'enet':
         model = ENet(num_classes).to(device)
-    elif args.model.lower() == 'unet':
+    elif args.net.lower() == 'unet':
         model = Unet(3, num_classes).to(device)
     # Check if the network architecture is correct
     print(model)
