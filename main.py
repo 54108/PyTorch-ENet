@@ -13,6 +13,7 @@ import tqdm
 
 import transforms as ext_transforms
 from models.enet import ENet
+from models.unet import Unet
 from train import Train
 from test import Test
 from metric.iou import IoU
@@ -150,7 +151,10 @@ def train(train_loader, val_loader, class_weights, class_encoding):
     num_classes = len(class_encoding)
 
     # Intialize ENet
-    model = ENet(num_classes).to(device)
+    if args.model.lower() == 'enet':
+        model = ENet(num_classes).to(device)
+    elif args.model.lower() == 'unet':
+        model = Unet(3, num_classes).to(device)
     # Check if the network architecture is correct
     print(model)
 
@@ -199,24 +203,24 @@ def train(train_loader, val_loader, class_weights, class_encoding):
         print(">>>> [Epoch: {0:d}] Avg. loss: {1:.4f} | Mean IoU: {2:.4f}".
               format(epoch, epoch_loss, miou))
 
-        if (epoch + 1) % 10 == 0 or epoch + 1 == args.epochs:
-            print(">>>> [Epoch: {0:d}] Validation".format(epoch))
+        # if (epoch + 1) % 10 == 0 or epoch + 1 == args.epochs:
+        print(">>>> [Epoch: {0:d}] Validation".format(epoch))
 
-            loss, (iou, miou) = val.run_epoch(args.print_step)
+        loss, (iou, miou) = val.run_epoch(args.print_step)
 
-            print(">>>> [Epoch: {0:d}] Avg. loss: {1:.4f} | Mean IoU: {2:.4f}".
-                  format(epoch, loss, miou))
+        print(">>>> [Epoch: {0:d}] Avg. loss: {1:.4f} | Mean IoU: {2:.4f}".
+                format(epoch, loss, miou))
 
-            # Print per class IoU on last epoch or if best iou
-            if epoch + 1 == args.epochs or miou > best_miou:
-                for key, class_iou in zip(class_encoding.keys(), iou):
-                    print("{0}: {1:.4f}".format(key, class_iou))
+        # Print per class IoU on last epoch or if best iou
+        if epoch + 1 == args.epochs or miou > best_miou:
+            for key, class_iou in zip(class_encoding.keys(), iou):
+                print("{0}: {1:.4f}".format(key, class_iou))
 
-            # Save the model if it's the best thus far
-            print("\nBest model thus far. Saving...\n")
-            best_miou = miou
-            utils.save_checkpoint(model, optimizer, epoch + 1, best_miou,
-                                    args)
+        # Save the model if it's the best thus far
+        print("\nBest model thus far. Saving...\n")
+        best_miou = miou
+        utils.save_checkpoint(model, optimizer, epoch + 1, best_miou,
+                                args)
 
     return model
 

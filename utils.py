@@ -74,7 +74,10 @@ def save_checkpoint(model, optimizer, epoch, miou, args):
         'optimizer': optimizer.state_dict()
     }
     torch.save(checkpoint, model_path)
-    torch.save(model.state_dict(), "model.pth")
+    torch.save(
+            obj=model.state_dict(),
+            f=f"train_Iou{100 * checkpoint['miou']:.3f}.pth"
+        )
 
     # Save arguments
     summary_filename = os.path.join(save_dir, name + '_summary.txt')

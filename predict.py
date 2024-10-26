@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 import transforms as ext_transforms
 from models.enet import ENet
+from models.unet import Unet
 from train import Train
 from test import Test
 from metric.iou import IoU
@@ -187,8 +188,7 @@ class Predict:
             output_np = np.resize(output_np, (200, 200)).astype(np.uint8)
 
             # 保存每个输出为单独的 .npy 文件
-            for i, output in enumerate(output_np):
-                np.save(f"predict/{image_file.split('.')[0]}.npy", output)
+            np.save(f"predict/{image_file.split('.')[0]}.npy", output_np)
 
 
 # Run only if this module is being run directly
@@ -198,15 +198,17 @@ if __name__ == '__main__':
     train_loader, val_loader, test_loader = loaders
 
     num_classes = len(class_encoding)
+    
     model = ENet(num_classes).to(device)
+    # model = Unet(3, num_classes).to(device)
 
     test_file_path = "data/neuseg/test/images"
 
     # Load the previoulsy saved model state to the ENet model
-    # checkpoint = torch.load('model.pth')
+    # checkpoint = torch.load('save/ENet', weights_only=True)
     # model.load_state_dict(checkpoint['state_dict'])
-    model.load_state_dict(torch.load('model.pth', weights_only=True))
-    # model.load_state_dict(torch.load('checkpoint.pth'))
+    model.load_state_dict(torch.load('train_Iou73.079.pth', weights_only=True))
+    # model.load_state_dict(torch.load('save/ENet'))
 
     # 创建 Predictor 实例并运行
     predictor = Predict(model, test_file_path, device)

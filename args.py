@@ -123,5 +123,11 @@ def get_arguments():
         type=str,
         default='save',
         help="The directory where models are saved. Default: save")
+    
+    parser.add_argument(
+        "--net",
+        default='ENet',
+        help="Network architecture. Default: ENet,or Unet"
+    )
 
     return parser.parse_args()
