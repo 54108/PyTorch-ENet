@@ -76,7 +76,7 @@ def save_checkpoint(model, optimizer, epoch, miou, args):
     torch.save(checkpoint, model_path)
     torch.save(
             obj=model.state_dict(),
-            f=f"train_Iou{100 * checkpoint['miou']:.3f}.pth"
+            f=f"save/train_Iou{100 * checkpoint['miou']:.3f}.pth"
         )
 
     # Save arguments

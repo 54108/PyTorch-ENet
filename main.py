@@ -21,6 +21,11 @@ from args import get_arguments
 from data.utils import enet_weighing, median_freq_balancing
 import utils
 
+def print_model_parameters(model):
+    """打印模型的参数量大小，单位为百万"""
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"模型参数量: {total_params / 1e6:.2f} M")
+
 # Get the arguments
 args = get_arguments()
 
@@ -157,6 +162,7 @@ def train(train_loader, val_loader, class_weights, class_encoding):
         model = Unet(3, num_classes).to(device)
     # Check if the network architecture is correct
     print(model)
+    print_model_parameters(model)
 
     # We are going to use the CrossEntropyLoss loss function as it's most
     # frequentely used in classification problems with multiple classes which

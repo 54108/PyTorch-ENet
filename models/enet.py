@@ -248,7 +248,7 @@ class DownsamplingBottleneck(nn.Module):
     def __init__(self,
                  in_channels,
                  out_channels,
-                 internal_ratio=4,
+                 internal_ratio=2,
                  return_indices=False,
                  dropout_prob=0,
                  bias=False,
@@ -572,6 +572,8 @@ class ENet(nn.Module):
         # Stage 5 - Decoder
         self.upsample5_0 = UpsamplingBottleneck(
             64, 16, dropout_prob=0.1, relu=decoder_relu)
+        self.upsample5_1 = UpsamplingBottleneck(
+            16, 4, dropout_prob=0.1, relu=decoder_relu)
         self.regular5_1 = RegularBottleneck(
             16, padding=1, dropout_prob=0.1, relu=decoder_relu)
         self.transposed_conv = nn.ConvTranspose2d(
@@ -584,47 +586,47 @@ class ENet(nn.Module):
 
     def forward(self, x):
         # Initial block
-        input_size = x.size()
-        x = self.initial_block(x)
+        input_size = x.size() #3 200 200
+        x_ini = self.initial_block(x) #16 100 100
 
         # Stage 1 - Encoder
-        stage1_input_size = x.size()
-        x, max_indices1_0 = self.downsample1_0(x)
-        x = self.regular1_1(x)
-        x = self.regular1_2(x)
-        x = self.regular1_3(x)
-        x = self.regular1_4(x)
+        stage1_input_size = x_ini.size()
+        x_e10, max_indices1_0 = self.downsample1_0(x_ini)
+        x_e11 = self.regular1_1(x_e10)
+        x_e12 = self.regular1_2(x_e11)
+        x_e13 = self.regular1_3(x_e12)
+        x_e1O = self.regular1_4(x_e13) #64 50 50
 
         # Stage 2 - Encoder
-        stage2_input_size = x.size()
-        x, max_indices2_0 = self.downsample2_0(x)
-        x = self.regular2_1(x)
-        x = self.dilated2_2(x)
-        x = self.asymmetric2_3(x)
-        x = self.dilated2_4(x)
-        x = self.regular2_5(x)
-        x = self.dilated2_6(x)
-        x = self.asymmetric2_7(x)
-        x = self.dilated2_8(x)
+        stage2_input_size = x_e1O.size()
+        x_e20, max_indices2_0 = self.downsample2_0(x_e1O)
+        x_e21 = self.regular2_1(x_e20)
+        x_e22 = self.dilated2_2(x_e21)
+        x_e23 = self.asymmetric2_3(x_e22)
+        x_e24 = self.dilated2_4(x_e23)
+        x_e25 = self.regular2_5(x_e24)
+        x_e26 = self.dilated2_6(x_e25)
+        x_e27 = self.asymmetric2_7(x_e26)
+        x_e2O = self.dilated2_8(x_e27) #128 25 25
 
         # Stage 3 - Encoder
-        x = self.regular3_0(x)
-        x = self.dilated3_1(x)
-        x = self.asymmetric3_2(x)
-        x = self.dilated3_3(x)
-        x = self.regular3_4(x)
-        x = self.dilated3_5(x)
-        x = self.asymmetric3_6(x)
-        x = self.dilated3_7(x)
+        x_e30 = self.regular3_0(x_e2O)
+        x_e31 = self.dilated3_1(x_e30)
+        x_e32 = self.asymmetric3_2(x_e31)
+        x_e33 = self.dilated3_3(x_e32)
+        x_e34 = self.regular3_4(x_e33)
+        x_e35 = self.dilated3_5(x_e34)
+        x_e36 = self.asymmetric3_6(x_e35)
+        x_e3O = self.dilated3_7(x_e36) + x_e2O#128 25 25
 
         # Stage 4 - Decoder
-        x = self.upsample4_0(x, max_indices2_0, output_size=stage2_input_size)
-        x = self.regular4_1(x)
-        x = self.regular4_2(x)
+        x_d40 = self.upsample4_0(x_e3O, max_indices2_0, output_size=stage2_input_size)
+        x_d41 = self.regular4_1(x_d40)
+        x_d4O = self.regular4_2(x_d41) + x_e1O#64 50 50
 
         # Stage 5 - Decoder
-        x = self.upsample5_0(x, max_indices1_0, output_size=stage1_input_size)
-        x = self.regular5_1(x)
-        x = self.transposed_conv(x, output_size=input_size)
+        x_d50 = self.upsample5_0(x_d4O, max_indices1_0, output_size=stage1_input_size) #16 100 100
+        x_d51 = self.regular5_1(x_d50)
+        x = self.transposed_conv(x_d51, output_size=input_size) #4 200 200
 
         return x

@@ -27,7 +27,7 @@ def get_arguments():
         "--batch-size",
         "-b",
         type=int,
-        default=8,
+        default=16,
         help="The batch size. Default: 2")
     parser.add_argument(
         "--epochs",
@@ -43,12 +43,12 @@ def get_arguments():
     parser.add_argument(
         "--lr-decay",
         type=float,
-        default=0.1,
+        default=0.5,
         help="The learning rate decay factor. Default: 0.5")
     parser.add_argument(
         "--lr-decay-epochs",
         type=int,
-        default=100,
+        default=25,
         help="The number of epochs before adjusting the learning rate. "
         "Default: 100")
     parser.add_argument(
@@ -126,7 +126,7 @@ def get_arguments():
     
     parser.add_argument(
         "--net",
-        default='ENet',
+        default='Enet',
         help="Network architecture. Default: ENet,or Unet"
     )
 
