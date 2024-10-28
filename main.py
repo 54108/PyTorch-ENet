@@ -145,11 +145,12 @@ def load_dataset(dataset):
             ignore_index = list(class_encoding).index('unlabeled')
             class_weights[ignore_index] = 0
 
+    class_weights = [22.05, 38.17, 29.93, 26.85]
+    class_weights = torch.tensor(class_weights).to(device)
     print("Class weights:", class_weights)
 
     return (train_loader, val_loader,
             test_loader), class_weights, class_encoding
-
 
 def train(train_loader, val_loader, class_weights, class_encoding):
     print("\nTraining...\n")
@@ -171,6 +172,7 @@ def train(train_loader, val_loader, class_weights, class_encoding):
     # frequentely used in classification problems with multiple classes which
     # fits the problem. This criterion  combines LogSoftMax and NLLLoss.
     criterion = nn.CrossEntropyLoss(weight=class_weights)
+    criterion2 = nn.CrossEntropyLoss(weight=class_weights)
 
     # ENet authors used Adam as the optimizer
     optimizer = optim.Adam(
@@ -201,7 +203,7 @@ def train(train_loader, val_loader, class_weights, class_encoding):
 
     # Start Training
     print()
-    train = Train(model, train_loader, optimizer, criterion, metric, device)
+    train = Train(model, train_loader, optimizer, criterion, criterion2, metric, device)
     val = Test(model, val_loader, criterion, metric, device)
     for epoch in range(start_epoch, args.epochs):
         print(">>>> [Epoch: {0:d}] Training".format(epoch))

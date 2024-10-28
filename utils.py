@@ -4,23 +4,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+"""
+    对labels进行独热编码
+    classes_num: 编码的类别数量
+    labels: 标签集合, [batch_size, channels=1, height, width]
 
-def batch_transform(batch, transform):
-    """Applies a transform to a batch of samples.
-
-    Keyword arguments:
-    - batch (): a batch os samples
-    - transform (callable): A function/transform to apply to ``batch``
-
-    """
-
-    # Convert the single channel label to RGB in tensor form
-    # 1. torch.unbind removes the 0-dimension of "labels" and returns a tuple of
-    # all slices along that dimension
-    # 2. the transform is applied to each slice
-    transf_slices = [transform(tensor) for tensor in torch.unbind(batch)]
-
-    return torch.stack(transf_slices)
+    返回值：独热编码后的矩阵, [batch_size, height, width, classes_num]
+"""
+@torch.no_grad()
+def one_hot(
+        classes_num: int,
+        labels: torch.Tensor,
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
+    assert len(labels.shape) == 4 and labels.shape[1] == 1
+    labels = labels.to(device)
+    # (batch_size, channels, height, width) -> (batch_size, height, width)
+    labels = labels.squeeze(dim=1).long()
+    # (batch_size, height, width, classes_num)
+    one_hot_labels = torch.zeros(*labels.shape, classes_num).to(device)
+    return torch.scatter(input=one_hot_labels, dim=-1, index=torch.unsqueeze(labels, -1), value=1.)
 
 
 def imshow_batch(images, labels):

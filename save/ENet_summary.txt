@@ -7,7 +7,7 @@ epochs: 300
 height: 200
 ignore_unlabeled: False
 learning_rate: 0.0005
-lr_decay: 0.5
+lr_decay: 0.1
 lr_decay_epochs: 25
 mode: train
 name: ENet
@@ -22,5 +22,5 @@ width: 200
 workers: 4
 
 BEST VALIDATION
-Epoch: 8
-Mean IoU: 0.5867077006898068
+Epoch: 138
+Mean IoU: 0.7435617601185847

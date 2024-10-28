@@ -345,9 +345,10 @@ class DownsamplingBottleneck(nn.Module):
         out = main + ext
 
         return self.out_activation(out), max_indices
-
+    
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
+ 
     def __init__(self, in_channels, out_channels):
         super().__init__()
         self.double_conv = nn.Sequential(
@@ -358,25 +359,13 @@ class DoubleConv(nn.Module):
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )
+ 
     def forward(self, x):
         return self.double_conv(x)
-        
-class Down(nn.Module):
-    """Downscaling with maxpool then double conv"""
-    def __init__(self, in_channels, out_channels):
-        super().__init__()
-        self.maxpool_conv = nn.Sequential(
-            nn.MaxPool2d(2),
-            DoubleConv(in_channels, out_channels)
-        )
-    def forward(self, x):
-        return self.maxpool_conv(x)
-
-
-
-
+    
 class Up(nn.Module):
     """Upscaling then double conv"""
+ 
     def __init__(self, in_channels, out_channels, bilinear=True):
         super().__init__()
  
@@ -400,30 +389,30 @@ class Up(nn.Module):
         x = torch.cat([x2, x1], dim=1)
         return self.conv(x)
     
-    
-class OutConv(nn.Module):
-    def __init__(self, in_channels, out_channels):
-        super(OutConv, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
- 
-    def forward(self, x):
-        return self.conv(x)
-
-
 
 class self_net(nn.Module):
-    def __init__(self, n_channels = 3, n_classes = 4, bilinear=True, encoder_relu=True, decoder_relu=True):
+    def __init__(self, n_channels = 3, n_classes = 4, encoder_relu = True):
         super(self_net, self).__init__()
         self.n_channels = n_channels
         self.n_classes = n_classes
-        self.bilinear = bilinear
-        self.encoder_relu = encoder_relu
-        self.decoder_relu = decoder_relu
-        self.initial_block = InitialBlock(3, 16, relu=encoder_relu)
+        self.SPConv = nn.Sequential(
+            nn.Conv2d(n_channels, 32, kernel_size=3,stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 64, kernel_size=3,stride=2, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(64, 128, kernel_size=3,stride=2, padding=1),
+            nn.ReLU(inplace=True)
+        )
+        self.conv1 = nn.Conv2d(128, 64, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv2 = nn.Conv2d(64, 4, kernel_size=1, stride=1, padding=0, bias=False)
+        self.conv3 = nn.Conv2d(128, 64, kernel_size=1, stride=1, padding=0, bias=False)
+        self.Conv4 = nn.Conv2d(128, 16, kernel_size=1, stride=1, padding=0, bias=False)
+        self.global_avg_pooling = nn.AdaptiveAvgPool2d((1, 1))
+        self.batch_norm = nn.BatchNorm2d(64)  # 在初始化时定义 BatchNorm2d 层
 
-        self.inc = DoubleConv(n_channels, 64)
-        self.down1 = Down(64, 128)
-        self.down2 = Down(128, 128)
+        self.conv4 = nn.Conv1d(4, 4, kernel_size=1, stride=1, padding=0, bias=False)
+
+        self.initial_block = InitialBlock(3, 16, relu=encoder_relu)
 
         # Stage 1 - Encoder
         self.downsample1_0 = DownsamplingBottleneck(
@@ -434,8 +423,10 @@ class self_net(nn.Module):
             relu=encoder_relu)
         self.regular1_1 = RegularBottleneck(
             64, padding=1, dropout_prob=0.01, relu=encoder_relu)
-        self.regular1_2 = RegularBottleneck(
-            64, padding=1, dropout_prob=0.01, relu=encoder_relu)
+        # self.regular1_2 = RegularBottleneck(
+        #     64, padding=1, dropout_prob=0.01, relu=encoder_relu)
+        self.dilated1_2 = RegularBottleneck(
+            64, dilation=2, padding=2, dropout_prob=0.01, relu=encoder_relu)
         self.regular1_3 = RegularBottleneck(
             64, padding=1, dropout_prob=0.01, relu=encoder_relu)
         self.regular1_4 = RegularBottleneck(
@@ -474,10 +465,10 @@ class self_net(nn.Module):
             relu=encoder_relu)
         self.dilated2_8 = RegularBottleneck(
             128, dilation=16, padding=16, dropout_prob=0.1, relu=encoder_relu)
-
+        
         self.regular5_1 = RegularBottleneck(
-            16, padding=1, dropout_prob=0.1, relu=decoder_relu)
-
+            16, padding=1, dropout_prob=0.1, relu=True)
+        
         self.transposed_conv = nn.ConvTranspose2d(
             16,
             n_classes,
@@ -489,39 +480,51 @@ class self_net(nn.Module):
         self.up1 = Up(256, 64, bilinear=True)
         self.up2 = Up(128, 16, bilinear=True)
         self.up3 = Up(32, 16, bilinear=True)
-        self.outc = OutConv(16, n_classes)
+
 
     def forward(self, x):
-        # Initial block
-        x_ini = self.initial_block(x) #16 100 100
+        # SP Branch
+        input_size = x.size()
+        x_spconv = self.SPConv(x) #128 25 25
+        x_spmiddle = self.conv1(x_spconv) #64 25 25
+        x_spfp = self.conv2(x_spmiddle) # SP feature map 4 25 25
+        x_spvector = self.global_avg_pooling(x_spfp) # 4 1 1
+         # 提取 x_spvector 第二个维度的最大值和最小值
+        x_spvector_max, _ = torch.max(x_spvector, dim=1, keepdim=True)  # 4, 1, 1
+        x_spvector_min, _ = torch.min(x_spvector, dim=1, keepdim=True)  # 4, 1, 1
 
-        x1 = self.inc(x) #64
-        x2 = self.down1(x1) #128
+        # 将最大值和最小值与 x_spmiddle 的其余维度进行相乘
+        x_spmax = x_spmiddle * x_spvector_max
+        x_spmin = x_spmiddle * x_spvector_min
+        x_sp = torch.cat((x_spmax, x_spmin), 1) # 128 25 25
+        x_sp = self.conv3(x_sp) # 64 25 25
+        x_spoutput = F.interpolate(x_sp, size=(50, 50), mode='bilinear', align_corners=True) # 64 50 50
+        x_spoutput = self.batch_norm(x_spoutput)
+
+        # Enet encoder Branch
+        x_ini = self.initial_block(x) #16 100 100
 
         # Stage 1 - Encoder
         x_e10, max_indices1_0 = self.downsample1_0(x_ini)
         x_e11 = self.regular1_1(x_e10)
-        x_e12 = self.regular1_2(x_e11)
-        # x_e13 = self.regular1_3(x_e12)
-        x_e1O = self.regular1_4(x_e12) #64 50 50
+        x_e12 = self.dilated1_2(x_e11)
+        x_e13 = self.regular1_3(x_e12)
 
         # Stage 2 - Encoder
-        x_e20, max_indices2_0 = self.downsample2_0(x_e1O)
+        x_e20, max_indices2_0 = self.downsample2_0(x_e13)
         x_e21 = self.regular2_1(x_e20)
         x_e22 = self.dilated2_2(x_e21)
         x_e23 = self.asymmetric2_3(x_e22)
         x_e24 = self.dilated2_4(x_e23)
-        x_e25 = self.regular2_5(x_e24)
-        x_e26 = self.dilated2_6(x_e25)
-        x_e27 = self.asymmetric2_7(x_e26)
-        x_e2O = self.dilated2_8(x_e27) #128 25 25
+        
+        # Decoder
+        x_u1 = self.up1(x_e23, x_e24) #16 25 25
+        x_u2 = self.up2(x_u1, x_e13) #16 50 50
+        x = torch.cat((x_spoutput, x_e13), 1)
+        x = self.Conv4(x) #16 50 50
+        x = F.interpolate(x, size=(100, 100), mode='bilinear', align_corners=True) # 64 100 100
+        x_u3 = self.up3(x_u2, x)
+        x = self.regular5_1(x_u3)
+        x = self.transposed_conv(x, output_size=input_size)
 
-        x_u1 = self.up1(x2, x_e2O) #64
-        x_u2 = self.up2(x_u1, x1) #16
-        x_u3 = self.up3(x_u2, x_ini) #16
-        x = self.outc(x_u3) #4
-
-        # x_d51 = self.regular5_1(x_u3)
-        # x = self.transposed_conv(x_d51, output_size=input_size) #4 200 200
-
-        return x
+        return (x, x_spvector)

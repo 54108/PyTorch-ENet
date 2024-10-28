@@ -14,6 +14,7 @@ from tqdm import tqdm
 import transforms as ext_transforms
 from models.enet import ENet
 from models.unet import Unet
+from models.model import self_net
 from train import Train
 from test import Test
 from metric.iou import IoU
@@ -199,7 +200,7 @@ if __name__ == '__main__':
 
     num_classes = len(class_encoding)
     
-    model = ENet(num_classes).to(device)
+    model = self_net(num_classes).to(device)
     # model = Unet(3, num_classes).to(device)
 
     test_file_path = "data/neuseg/test/images"
@@ -207,7 +208,7 @@ if __name__ == '__main__':
     # Load the previoulsy saved model state to the ENet model
     # checkpoint = torch.load('save/ENet', weights_only=True)
     # model.load_state_dict(checkpoint['state_dict'])
-    model.load_state_dict(torch.load('train_Iou73.079.pth', weights_only=True))
+    model.load_state_dict(torch.load('save/train_Iou74.483.pth', weights_only=True))
     # model.load_state_dict(torch.load('save/ENet'))
 
     # 创建 Predictor 实例并运行
