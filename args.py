@@ -126,7 +126,7 @@ def get_arguments():
     
     parser.add_argument(
         "--net",
-        default='Enet',
+        default='self_net',
         help="Network architecture. Default: ENet,or Unet"
     )
 

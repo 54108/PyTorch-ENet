@@ -14,6 +14,7 @@ import tqdm
 import transforms as ext_transforms
 from models.enet import ENet
 from models.unet import Unet
+from models.model import self_net
 from train import Train
 from test import Test
 from metric.iou import IoU
@@ -160,6 +161,8 @@ def train(train_loader, val_loader, class_weights, class_encoding):
         model = ENet(num_classes).to(device)
     elif args.net.lower() == 'unet':
         model = Unet(3, num_classes).to(device)
+    elif args.net.lower() == 'self_net':
+        model = self_net().to(device)
     # Check if the network architecture is correct
     print(model)
     print_model_parameters(model)

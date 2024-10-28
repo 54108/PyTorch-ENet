@@ -1,3 +1,4 @@
+import torch.nn.functional as F
 import torch.nn as nn
 import torch
 
@@ -462,6 +463,59 @@ class UpsamplingBottleneck(nn.Module):
         out = main + ext
 
         return self.out_activation(out)
+    
+class DoubleConv(nn.Module):
+    """(convolution => [BN] => ReLU) * 2"""
+ 
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.double_conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
+ 
+    def forward(self, x):
+        return self.double_conv(x)
+    
+class Up(nn.Module):
+    """Upscaling then double conv"""
+ 
+    def __init__(self, in_channels, out_channels, bilinear=True):
+        super().__init__()
+ 
+        # if bilinear, use the normal convolutions to reduce the number of channels
+        if bilinear:
+            self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        else:
+            self.up = nn.ConvTranspose2d(in_channels // 2, in_channels // 2, kernel_size=2, stride=2)
+ 
+        self.conv = DoubleConv(in_channels, out_channels)
+ 
+    def forward(self, x1, x2):
+        x1 = self.up(x1)
+        # input is CHW
+        diffY = torch.tensor([x2.size()[2] - x1.size()[2]])
+        diffX = torch.tensor([x2.size()[3] - x1.size()[3]])
+ 
+        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
+                        diffY // 2, diffY - diffY // 2])
+ 
+        x = torch.cat([x2, x1], dim=1)
+        return self.conv(x)
+        
+        
+        
+class OutConv(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(OutConv, self).__init__()
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+ 
+    def forward(self, x):
+        return self.conv(x)
 
 
 class ENet(nn.Module):
@@ -478,7 +532,7 @@ class ENet(nn.Module):
 
     """
 
-    def __init__(self, num_classes, encoder_relu=False, decoder_relu=True):
+    def __init__(self, num_classes = 4, encoder_relu=False, decoder_relu=True):
         super().__init__()
 
         self.initial_block = InitialBlock(3, 16, relu=encoder_relu)
@@ -560,45 +614,24 @@ class ENet(nn.Module):
             relu=encoder_relu)
         self.dilated3_7 = RegularBottleneck(
             128, dilation=16, padding=16, dropout_prob=0.1, relu=encoder_relu)
-
-        # Stage 4 - Decoder
-        self.upsample4_0 = UpsamplingBottleneck(
-            128, 64, dropout_prob=0.1, relu=decoder_relu)
-        self.regular4_1 = RegularBottleneck(
-            64, padding=1, dropout_prob=0.1, relu=decoder_relu)
-        self.regular4_2 = RegularBottleneck(
-            64, padding=1, dropout_prob=0.1, relu=decoder_relu)
-
-        # Stage 5 - Decoder
-        self.upsample5_0 = UpsamplingBottleneck(
-            64, 16, dropout_prob=0.1, relu=decoder_relu)
-        self.upsample5_1 = UpsamplingBottleneck(
-            16, 4, dropout_prob=0.1, relu=decoder_relu)
-        self.regular5_1 = RegularBottleneck(
-            16, padding=1, dropout_prob=0.1, relu=decoder_relu)
-        self.transposed_conv = nn.ConvTranspose2d(
-            16,
-            num_classes,
-            kernel_size=3,
-            stride=2,
-            padding=1,
-            bias=False)
+        
+        self.up1 = Up(256, 64, bilinear=True)
+        self.up2 = Up(128, 16, bilinear=True)
+        self.up3 = Up(32, 16, bilinear=True)
+        self.outc = OutConv(16, num_classes)
 
     def forward(self, x):
         # Initial block
-        input_size = x.size() #3 200 200
         x_ini = self.initial_block(x) #16 100 100
 
         # Stage 1 - Encoder
-        stage1_input_size = x_ini.size()
         x_e10, max_indices1_0 = self.downsample1_0(x_ini)
         x_e11 = self.regular1_1(x_e10)
         x_e12 = self.regular1_2(x_e11)
-        x_e13 = self.regular1_3(x_e12)
-        x_e1O = self.regular1_4(x_e13) #64 50 50
+        # x_e13 = self.regular1_3(x_e12)
+        x_e1O = self.regular1_4(x_e12) #64 50 50
 
         # Stage 2 - Encoder
-        stage2_input_size = x_e1O.size()
         x_e20, max_indices2_0 = self.downsample2_0(x_e1O)
         x_e21 = self.regular2_1(x_e20)
         x_e22 = self.dilated2_2(x_e21)
@@ -617,16 +650,11 @@ class ENet(nn.Module):
         x_e34 = self.regular3_4(x_e33)
         x_e35 = self.dilated3_5(x_e34)
         x_e36 = self.asymmetric3_6(x_e35)
-        x_e3O = self.dilated3_7(x_e36) + x_e2O#128 25 25
+        x_e3O = self.dilated3_7(x_e36)#128 25 25
 
-        # Stage 4 - Decoder
-        x_d40 = self.upsample4_0(x_e3O, max_indices2_0, output_size=stage2_input_size)
-        x_d41 = self.regular4_1(x_d40)
-        x_d4O = self.regular4_2(x_d41) + x_e1O#64 50 50
-
-        # Stage 5 - Decoder
-        x_d50 = self.upsample5_0(x_d4O, max_indices1_0, output_size=stage1_input_size) #16 100 100
-        x_d51 = self.regular5_1(x_d50)
-        x = self.transposed_conv(x_d51, output_size=input_size) #4 200 200
+        x_u1 = self.up1(x_e3O, x_e2O)
+        x_u2 = self.up2(x_u1, x_e1O)
+        x_u3 = self.up3(x_u2, x_ini)
+        x = self.outc(x_u3)
 
         return x

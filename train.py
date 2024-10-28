@@ -42,6 +42,8 @@ class Train:
 
             # Forward propagation
             outputs = self.model(inputs)
+            # print(outputs.shape, labels.shape)
+            # assert 1 == 0
 
             # Loss computation
             loss = self.criterion(outputs, labels)

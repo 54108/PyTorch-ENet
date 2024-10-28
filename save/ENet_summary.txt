@@ -11,7 +11,7 @@ lr_decay: 0.5
 lr_decay_epochs: 25
 mode: train
 name: ENet
-net: Enet
+net: self_net
 predict: False
 print_step: False
 resume: False
@@ -22,5 +22,5 @@ width: 200
 workers: 4
 
 BEST VALIDATION
-Epoch: 17
-Mean IoU: 0.6297073495075037
+Epoch: 8
+Mean IoU: 0.5867077006898068
