@@ -22,5 +22,5 @@ width: 200
 workers: 4
 
 BEST VALIDATION
-Epoch: 138
-Mean IoU: 0.7435617601185847
+Epoch: 22
+Mean IoU: 0.6679396388770726

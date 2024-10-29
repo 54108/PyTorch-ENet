@@ -181,7 +181,7 @@ class Predict:
                 predictions = self.model(image)
 
             # 将预测结果转换为单通道
-            _, predictions = torch.max(predictions.data, 1)
+            _, predictions = torch.max(predictions[0], 1)
 
             # 确保输出形状为 (200, 200)
             output_np = predictions.cpu().numpy()
@@ -200,7 +200,7 @@ if __name__ == '__main__':
 
     num_classes = len(class_encoding)
     
-    model = self_net(num_classes).to(device)
+    model = self_net(n_classes=num_classes).to(device)
     # model = Unet(3, num_classes).to(device)
 
     test_file_path = "data/neuseg/test/images"
@@ -208,7 +208,7 @@ if __name__ == '__main__':
     # Load the previoulsy saved model state to the ENet model
     # checkpoint = torch.load('save/ENet', weights_only=True)
     # model.load_state_dict(checkpoint['state_dict'])
-    model.load_state_dict(torch.load('save/train_Iou74.483.pth', weights_only=True))
+    model.load_state_dict(torch.load('save/train_Iou74.708.pth', weights_only=True))
     # model.load_state_dict(torch.load('save/ENet'))
 
     # 创建 Predictor 实例并运行

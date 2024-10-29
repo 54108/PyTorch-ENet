@@ -145,7 +145,7 @@ def load_dataset(dataset):
             ignore_index = list(class_encoding).index('unlabeled')
             class_weights[ignore_index] = 0
 
-    class_weights = [22.05, 38.17, 29.93, 26.85]
+    class_weights = [17.05, 38.17, 29.93, 26.85]
     class_weights = torch.tensor(class_weights).to(device)
     print("Class weights:", class_weights)
 
